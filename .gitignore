@@ -1,6 +1,3 @@
-credentials.json
-credentials-web.json
-token.json
 __pychache__/
 venv/
 *.pyc
