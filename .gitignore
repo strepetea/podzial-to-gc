@@ -4,4 +4,4 @@ token.json
 __pychache__/
 venv/
 *.pyc
-
+timetable.ics

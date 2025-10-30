@@ -1,10 +1,12 @@
+import requests
+import pytz
+import uuid
 from bs4 import BeautifulSoup, Tag
 from collections import UserList
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, time as time_obj
-from icalendar import Timezone, Calendar, Event, vDatetime
-import pytz
-import requests
+from icalendar import (Timezone, TimezoneDaylight, TimezoneStandard,
+                       Calendar, Event, vDatetime)
 
 IS_WINTER_TERM = True
 WINTER_TERM_START = date(2025, 10, 1)
@@ -21,10 +23,10 @@ class CalendarEntry:
     location: str
     """Location of the class (building and room number)."""
 
-    start_time: vDatetime
+    start_time: datetime
     """Starting time, formatted as RFC 5545 vDatetime."""
 
-    end_time: vDatetime
+    end_time: datetime
     """Ending time, formatted as RFC 5545 vDatetime."""
 
 
@@ -65,8 +67,8 @@ class CalendarEntryList(UserList):
 
             is_duplicate = (
                 cur_entry.class_name == merged_entry.class_name and
-                cur_entry.start_time.dt.weekday() ==
-                merged_entry.start_time.dt.weekday()
+                cur_entry.start_time.weekday() ==
+                merged_entry.start_time.weekday()
             )
 
             if is_duplicate:
@@ -107,7 +109,7 @@ class CalendarEntryList(UserList):
         """
         sorted_list = CalendarEntryList(sorted(
             self,
-            key=lambda entry: (entry.class_name, entry.start_time.dt)
+            key=lambda entry: (entry.class_name, entry.start_time)
         ))
         return sorted_list
 
@@ -191,13 +193,29 @@ def create_entry_list(
 
 
 def create_warsaw_timezone_component():
-    """Generates a VTIMEZONE component for Europe/Warsaw."""
 
-    tz = pytz.timezone('Europe/Warsaw')
+    tzid_str = 'Europe/Warsaw'
+    tz = pytz.timezone(tzid_str)
 
     tzc = Timezone()
-    tzc.add('tzid', 'Europe/Warsaw')
-    tzc.add_from_dt(datetime(2023, 1, 1, tzinfo=tz))
+    tzc.add('tzid', tzid_str)
+
+    tzcd = TimezoneDaylight()
+    tzcd.add('tzname', 'CEST')
+    tzcd.add('dtstart', datetime(1987, 3, 29, 2, 0, 0, tzinfo=tz))
+    tzcd.add('rrule', {'freq': 'yearly', 'byday': '-1su', 'bymonth': 3})
+    tzcd.add('tzoffsetfrom', timedelta(hours=1))  # From CET (UTC+1)
+    tzcd.add('tzoffsetto', timedelta(hours=2))   # To CEST (UTC+2)
+    tzc.add_component(tzcd)
+
+    tzcs = TimezoneStandard()
+    tzcs.add('tzname', 'CET')
+    tzcs.add('dtstart', datetime(1987, 10, 25, 3, 0, 0, tzinfo=tz))
+    tzcs.add('rrule', {'freq': 'yearly', 'byday': '-1su',
+             'bymonth': 10})
+    tzcs.add('tzoffsetfrom', timedelta(hours=2))
+    tzcs.add('tzoffsetto', timedelta(hours=1))
+    tzc.add_component(tzcs)
 
     return tzc
 
@@ -208,6 +226,52 @@ def gen_ics(cal_list: CalendarEntryList):
     cal.add('version', '2.0')
     cal.add('x-wr-calname', 'WM Plan lekcji')
 
+    warsaw_tz_component = create_warsaw_timezone_component()
+    cal.add_component(warsaw_tz_component)
+
+    for entry in cal_list:
+        event = Event()
+
+        event.add('summary', entry.location + ' ' + entry.class_name)
+        event.add('dtstart', entry.start_time)
+        event.add('dtend', entry.end_time)
+
+        event.add('location', entry.location)
+
+        event.add('uid', str(uuid.uuid4()))
+
+        event.add('rrule', gen_rrule_str())
+
+        cal.add_component(event)
+
+    with open("timetable.ics", 'wb') as f:
+        f.write(cal.to_ical())
+
+    print("Successfully created the timetable.ics!")
+
+
+def gen_rrule_str() -> str:
+    if IS_WINTER_TERM:
+        until_date = SUMMER_TERM_START - timedelta(days=1)
+    else:
+        until_date = date(2026, 6, 30)
+
+    tz = pytz.timezone("Europe/Warsaw")
+
+    naive_dt = datetime.combine(until_date, time_obj(23, 59, 59))
+
+    aware_dt_warsaw = tz.localize(naive_dt)
+
+    end_date_dt_utc = aware_dt_warsaw.astimezone(pytz.utc)
+
+    until_str = (vDatetime(end_date_dt_utc)
+                 .to_ical()
+                 .decode('utf-8')
+                 )
+    rrule_string = f"FREQ=WEEKLY;INTERVAL=2;UNTIL={until_str}"
+
+    return rrule_string
+
 
 def get_s_and_e(
     td_str: str,
@@ -217,17 +281,17 @@ def get_s_and_e(
 ) -> tuple[time_obj, time_obj]:
 
     if is_odd_class(td_str, idx):
-        st = gen_vDatetime(time_from_int(time), weekday)
-        et = gen_vDatetime(time_from_int(time + 45), weekday)
+        st = gen_datetime(time_from_int(time), weekday)
+        et = gen_datetime(time_from_int(time + 45), weekday)
     else:
-        st = gen_vDatetime(
+        st = gen_datetime(
             time_from_int(time), weekday + 7)
-        et = gen_vDatetime(
+        et = gen_datetime(
             time_from_int(time + 45), weekday + 7)
     return st, et
 
 
-def gen_vDatetime(time, weekday) -> vDatetime:
+def gen_datetime(time, weekday) -> datetime:
     """
     Generates a timezone-aware RFC 5545 vDatetime for an iCalendar event
     starting on a specific weekday within an academic term.
@@ -252,7 +316,8 @@ def gen_vDatetime(time, weekday) -> vDatetime:
 
     aware_dt = tz.localize(datetime.combine(
         start_date + timedelta(days=weekday), time))
-    return vDatetime(aware_dt)
+
+    return aware_dt
 
 
 def time_from_int(time_i: int) -> time_obj:
@@ -385,8 +450,7 @@ def main():
     timetable = fetch_timetable(url)
     entries = create_entry_list(timetable, "L05", "K02")
 
-    for entry in entries:
-        print(str(entry) + '\n')
+    gen_ics(entries)
 
 
 if __name__ == "__main__":
