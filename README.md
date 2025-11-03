@@ -1,2 +1,2 @@
 # podzial-to-gc
-A simple script to unfuck the CUT MF timetable.
+A simple script to unf*ck the Faculty of Mechanical Engineering's (CUT) timetable.
