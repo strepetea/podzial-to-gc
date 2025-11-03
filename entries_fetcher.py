@@ -67,8 +67,8 @@ class CalendarEntryList(UserList):
 
             is_duplicate = (
                 cur_entry.class_name == merged_entry.class_name and
-                cur_entry.start_time.weekday() ==
-                merged_entry.start_time.weekday()
+                cur_entry.start_time.day ==
+                merged_entry.start_time.day
             )
 
             if is_duplicate:
