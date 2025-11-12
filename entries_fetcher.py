@@ -115,16 +115,25 @@ class CalendarEntryList(UserList):
 
     def cleanup_names(self):
         """
-        Removes suffixes starting with -(N and -(P from class names.
+        Removes suffixes starting with -(N and -(P from class names
+        and trailing '-n' and '-p' from the locations.
         """
         for entry in self:
             name = entry.class_name
+            loc = entry.location
             if '-(N' in name:
                 end = name.find('-(N')
                 entry.class_name = name[:end]
             elif '-(P' in name:
                 end = name.find('-(P')
                 entry.class_name = name[:end]
+
+            if '-n' in loc:
+                end = loc.find('-n')
+                entry.location = loc[:end]
+            elif '-p' in loc:
+                end = loc.find('-p')
+                entry.location = loc[:end]
         return self
 
 
@@ -235,8 +244,6 @@ def gen_ics(cal_list: CalendarEntryList):
         event.add('summary', entry.location + ' ' + entry.class_name)
         event.add('dtstart', entry.start_time)
         event.add('dtend', entry.end_time)
-
-        event.add('location', entry.location)
 
         event.add('uid', str(uuid.uuid4()))
 
