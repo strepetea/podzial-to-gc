@@ -9,8 +9,20 @@ from icalendar import (Timezone, TimezoneDaylight, TimezoneStandard,
                        Calendar, Event, vDatetime)
 
 IS_WINTER_TERM = False
+
+# TODO: Both term start weeks are considered odd in the program's logic, may need to be changed later.
 WINTER_TERM_START = date(2025, 10, 1)
 SUMMER_TERM_START = date(2026, 2, 23)
+
+# Provide a url for the timetable.
+# TODO: Make an enum for easy timetable assignment.
+TIMETABLE_URL = 'https://podzial.mech.pk.edu.pl/stacjonarne/html/plany/o22.html'
+
+# Either provide your group number here or leave it be. If you don't have a P group
+# on the timetable, it will simply be ignored. 
+K_GROUP = "K02"
+L_GROUP = "L02"
+P_GROUP = "P02"
 
 
 @dataclass
@@ -460,9 +472,9 @@ def count_substrings(string: str, subs: str) -> int:
 
 
 def main():
-    url = 'https://podzial.mech.pk.edu.pl/stacjonarne/html/plany/o22.html'
+    url = TIMETABLE_URL
     timetable = fetch_timetable(url)
-    entries = create_entry_list(timetable, "L02", "K02", "P02")
+    entries = create_entry_list(timetable, L_GROUP, K_GROUP, P_GROUP)
 
     gen_ics(entries)
 
