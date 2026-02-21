@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta, time as time_obj
 from icalendar import (Timezone, TimezoneDaylight, TimezoneStandard,
                        Calendar, Event, vDatetime)
 
-IS_WINTER_TERM = True
+IS_WINTER_TERM = False
 WINTER_TERM_START = date(2025, 10, 1)
 SUMMER_TERM_START = date(2026, 2, 23)
 
@@ -54,7 +54,7 @@ class CalendarEntryList(UserList):
 
     def merge_duplicates(self):
         """
-        Merges classes of the same name that occur on the same day.
+        Merges events of the same name that occur on the same day.
         For example, if there are multiple English classes on odd Monday
         in the entry_list, it sequentially goes through the entry_list
         and assigns the next class' end_time to the first class' end_time.
@@ -78,7 +78,7 @@ class CalendarEntryList(UserList):
 
         return merged_list
 
-    def remove_other_groups(self, l_group: str, k_group: str):
+    def remove_other_groups(self, l_group: str, k_group: str, p_group: str):
         """
         Removes Lab and KompLab classes of groups other than the
         ones specified.
@@ -88,6 +88,8 @@ class CalendarEntryList(UserList):
                 Example: "L01"
             k_group(str): The KompLab group. Case-insensitive.
                 Example: "K01"
+            p_group(str): The Project group. Case-insensitive.
+                Example: "P01"
         """
         modified_list = CalendarEntryList()
         for entry in self:
@@ -97,6 +99,9 @@ class CalendarEntryList(UserList):
                 continue
             elif ("k0" in name and
                     k_group.lower() not in name):
+                continue
+            elif ("p0" in name and
+                    p_group.lower() not in name):
                 continue
             else:
                 modified_list.append(entry)
@@ -140,7 +145,8 @@ class CalendarEntryList(UserList):
 def create_entry_list(
         timetable,
         l_group,
-        k_group
+        k_group,
+        p_group
 ) -> CalendarEntryList:
     """
     Parses a BS4 HTML timetable Tag to create a cleaned list of
@@ -153,8 +159,9 @@ def create_entry_list(
     Args:
         timetable (BeautifulSoup Tag): The HTML table structure.
         is_winter_term (bool): True if the schedule is winter term.
-        l_group (str): The desired lecture group code (e.g., 'L01').
-        k_group (str): The desired seminar group code (e.g., 'K02').
+        l_group (str): The desired Lab group code (e.g., 'L01').
+        k_group (str): The desired KompLab group code (e.g., 'K02').
+        p_group (str): The desired Project group code (e.g., 'P03').
 
     Returns:
         CalendarEntryList: List of entries, merged and filtered.
@@ -196,7 +203,7 @@ def create_entry_list(
     return (
         entry_list
         .merge_duplicates()
-        .remove_other_groups(l_group, k_group)
+        .remove_other_groups(l_group, k_group, p_group)
         .cleanup_names()
     )
 
@@ -453,9 +460,9 @@ def count_substrings(string: str, subs: str) -> int:
 
 
 def main():
-    url = 'https://podzial.mech.pk.edu.pl/stacjonarne/html/plany/o23.html'
+    url = 'https://podzial.mech.pk.edu.pl/stacjonarne/html/plany/o22.html'
     timetable = fetch_timetable(url)
-    entries = create_entry_list(timetable, "L05", "K02")
+    entries = create_entry_list(timetable, "L02", "K02", "P02")
 
     gen_ics(entries)
 
